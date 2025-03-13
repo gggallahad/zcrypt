@@ -26,7 +26,7 @@ pub fn main() !void {
             var encryptor = encrypt.Encryptor.init(args.password);
             switch (args.content) {
                 .directory => {
-                    // TODO
+                    try encryptor.encryptDirectory(allocator, args.src, args.dst);
                 },
 
                 .file => {
@@ -39,7 +39,7 @@ pub fn main() !void {
             var decryptor = decrypt.Decryptor.init(args.password);
             switch (args.content) {
                 .directory => {
-                    // TODO
+                    try decryptor.decryptDirectory(allocator, args.src, args.dst);
                 },
 
                 .file => {

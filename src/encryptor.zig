@@ -21,11 +21,56 @@ pub const Encryptor = struct {
         return encryptor;
     }
 
+    pub fn encryptDirectory(self: *Encryptor, allocator: std.mem.Allocator, src: []const u8, dst: []const u8) !void {
+        var fs_directory = try std.fs.cwd().openDir(src, .{ .iterate = true });
+
+        try self.walkDirectory(allocator, &fs_directory, dst);
+    }
+
+    fn walkDirectory(self: *Encryptor, allocator: std.mem.Allocator, fs_directory: *std.fs.Dir, dst: []const u8) !void {
+        errdefer fs_directory.close();
+
+        try std.fs.cwd().makePath(dst);
+
+        var iterator = fs_directory.iterate();
+        while (try iterator.next()) |fs_entry| {
+            const new_dst = try std.fs.path.join(allocator, &[_][]const u8{ dst, fs_entry.name });
+            errdefer allocator.free(new_dst);
+
+            switch (fs_entry.kind) {
+                .directory => {
+                    var new_fs_directory = try fs_directory.openDir(fs_entry.name, .{ .iterate = true });
+
+                    try self.walkDirectory(allocator, &new_fs_directory, new_dst);
+                },
+
+                .file => {
+                    const src = try fs_directory.realpathAlloc(allocator, ".");
+                    errdefer allocator.free(src);
+                    const new_src = try std.fs.path.join(allocator, &[_][]const u8{ src, fs_entry.name });
+                    errdefer allocator.free(new_src);
+
+                    try self.encryptFile(allocator, new_src, new_dst);
+
+                    allocator.free(new_src);
+                    allocator.free(src);
+                },
+
+                else => continue,
+            }
+
+            allocator.free(new_dst);
+        }
+
+        fs_directory.close();
+    }
+
     pub fn encryptFile(self: *Encryptor, allocator: std.mem.Allocator, src: []const u8, dst: []const u8) !void {
         var new_file = try file.File.init(allocator, src, dst);
         errdefer new_file.deinit(allocator);
 
         var file_data = try new_file.read(allocator);
+        errdefer allocator.free(file_data);
 
         file_data = try self.addPadding(allocator, file_data);
 
