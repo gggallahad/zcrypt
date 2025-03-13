@@ -3,17 +3,14 @@ const std = @import("std");
 pub const File = struct {
     src: []const u8,
     dst: []const u8,
-    data: []u8,
 
     pub fn init(allocator: std.mem.Allocator, src: []const u8, dst: []const u8) !File {
         const file_src = try allocator.dupe(u8, src);
         const file_dst = try allocator.dupe(u8, dst);
-        const file_data = try allocator.alloc(u8, 0);
 
         const file = File{
             .src = file_src,
             .dst = file_dst,
-            .data = file_data,
         };
         return file;
     }
@@ -21,26 +18,27 @@ pub const File = struct {
     pub fn deinit(self: *File, allocator: std.mem.Allocator) void {
         allocator.free(self.src);
         allocator.free(self.dst);
-        allocator.free(self.data);
     }
 
-    pub fn read(self: *File, allocator: std.mem.Allocator) !void {
+    pub fn read(self: *File, allocator: std.mem.Allocator) ![]u8 {
         const fs_file = try std.fs.cwd().openFile(self.src, .{});
         errdefer fs_file.close();
 
         const file_size = try fs_file.getEndPos();
 
-        self.data = try allocator.realloc(self.data, file_size);
-        _ = try fs_file.readAll(self.data);
+        const file_data = try allocator.alloc(u8, file_size);
+        _ = try fs_file.readAll(file_data);
 
         fs_file.close();
+
+        return file_data;
     }
 
-    pub fn write(self: *File) !void {
+    pub fn write(self: *File, file_data: []u8) !void {
         const fs_file = try std.fs.cwd().createFile(self.dst, .{});
         errdefer fs_file.close();
 
-        try fs_file.writeAll(self.data);
+        try fs_file.writeAll(file_data);
 
         fs_file.close();
     }

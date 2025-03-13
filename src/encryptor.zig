@@ -25,13 +25,15 @@ pub const Encryptor = struct {
         var new_file = try file.File.init(allocator, src, dst);
         errdefer new_file.deinit(allocator);
 
-        try new_file.read(allocator);
+        var file_data = try new_file.read(allocator);
 
-        new_file.data = try self.addPadding(allocator, new_file.data);
+        file_data = try self.addPadding(allocator, file_data);
 
-        new_file.data = self.encryptFileData(new_file.data);
+        file_data = self.encryptFileData(file_data);
 
-        try new_file.write();
+        try new_file.write(file_data);
+
+        allocator.free(file_data);
 
         new_file.deinit(allocator);
     }
